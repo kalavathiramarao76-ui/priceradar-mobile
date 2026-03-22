@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/auth_wall.dart';
+import '../services/auth_service.dart';
 import 'price_analyzer_screen.dart';
 import 'comparison_screen.dart';
 import 'dynamic_pricing_screen.dart';
@@ -15,24 +17,50 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final AuthService _authService = AuthService();
+  bool _showAuthWall = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final needsAuth = await _authService.needsAuth();
+    if (mounted) setState(() => _showAuthWall = needsAuth);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E14),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: const [
-          _HomeContent(),
-          PriceAnalyzerScreen(),
-          ComparisonScreen(),
-          AlertsScreen(),
-          SettingsScreen(),
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _selectedIndex,
+            children: const [
+              _HomeContent(),
+              PriceAnalyzerScreen(),
+              ComparisonScreen(),
+              AlertsScreen(),
+              SettingsScreen(),
+            ],
+          ),
+          if (_showAuthWall)
+            AuthWall(
+              authService: _authService,
+              onSignedIn: () => setState(() => _showAuthWall = false),
+            ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+        onDestinationSelected: (i) async {
+          await _authService.incrementUsage();
+          await _checkAuth();
+          if (!_showAuthWall) setState(() => _selectedIndex = i);
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.analytics_rounded), label: 'Analyze'),
